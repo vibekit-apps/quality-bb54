@@ -1,0 +1,396 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { api } from '../lib/api';
+
+type VideoDraft = {
+  title: string;
+  duration: string;
+  format: string;
+  quality: string;
+  source: string;
+  uri?: string;
+};
+
+type SuggestionResponse = {
+  caption: string;
+  hashtags: string[];
+  hook: string;
+  exportNote: string;
+};
+
+const steps = ['Video Picker', 'Quality Enhance', 'TikTok Studio', 'Caption Builder', 'Export Options'] as const;
+
+const sampleVideos: VideoDraft[] = [
+  { title: 'Glow-up transition', duration: '00:18', format: 'MP4', quality: '720p', source: 'Camera Roll' },
+  { title: 'Street fit reveal', duration: '00:27', format: 'MOV', quality: '1080p', source: 'Downloads' },
+  { title: 'Product close-up', duration: '00:12', format: 'MP4', quality: '4K', source: 'Files' },
+];
+
+export default function Home() {
+  const [step, setStep] = useState(0);
+  const [selectedVideo, setSelectedVideo] = useState<VideoDraft | null>(sampleVideos[0]);
+  const [videoName, setVideoName] = useState(sampleVideos[0].title);
+  const [manualSource, setManualSource] = useState('');
+  const [autoEnhance, setAutoEnhance] = useState(true);
+  const [sharpness, setSharpness] = useState(78);
+  const [clarity, setClarity] = useState(82);
+  const [noiseReduction, setNoiseReduction] = useState(64);
+  const [cropMode, setCropMode] = useState<'Original' | '9:16' | '1:1' | '16:9'>('Original');
+  const [exportFormat, setExportFormat] = useState<'TikTok MP4' | 'High Bitrate MOV'>('TikTok MP4');
+  const [fps, setFps] = useState<'30 FPS' | '60 FPS'>('30 FPS');
+  const [resolution, setResolution] = useState<'1080p' | '4K'>('1080p');
+  const [suggestions, setSuggestions] = useState<SuggestionResponse | null>(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [error, setError] = useState('');
+  const [renderStatus, setRenderStatus] = useState('Automatic enhance is ready.');
+
+  const completion = useMemo(() => Math.round(((step + 1) / steps.length) * 100), [step]);
+
+  const currentVideo: VideoDraft = selectedVideo || {
+    title: videoName.trim() || 'Untitled clip',
+    duration: '00:15',
+    format: 'MP4',
+    quality: resolution,
+    source: manualSource.trim() || 'Manual import',
+  };
+
+  const updateVideoFromManual = () => {
+    const title = videoName.trim() || 'Untitled clip';
+    setSelectedVideo({ title, duration: '00:15', format: 'MP4', quality: resolution, source: manualSource.trim() || 'Manual import' });
+    setError('');
+  };
+
+  const pickVideo = async () => {
+    setError('');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError('Allow Photos access in iPhone Settings to select a video.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsEditing: false, quality: 1 });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const totalSeconds = Math.max(0, Math.round((asset.duration || 0) / 1000));
+    const duration = totalSeconds ? `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}` : 'Video';
+    const title = asset.fileName?.replace(/\.[^.]+$/, '') || 'Selected video';
+    const format = asset.mimeType?.split('/')[1]?.toUpperCase() || 'VIDEO';
+    const picked = { title, duration, format, quality: resolution, source: 'iPhone Photos', uri: asset.uri };
+    setSelectedVideo(picked);
+    setVideoName(title);
+    setManualSource('iPhone Photos');
+  };
+
+  const buildCaptions = async () => {
+    setLoadingSuggestions(true);
+    setError('');
+    try {
+      const data = await api<SuggestionResponse>('POST', '/api/caption-suggestions', {
+        title: currentVideo.title,
+        duration: currentVideo.duration,
+        source: currentVideo.source,
+        quality: currentVideo.quality,
+        sharpness,
+        clarity,
+        noiseReduction,
+        cropMode,
+        exportFormat,
+        fps,
+        resolution,
+      });
+      setSuggestions(data);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const startRender = () => {
+    setRenderStatus(`Render queued: ${resolution}, ${fps}, ${exportFormat}, ${cropMode} crop.`);
+    setStep(4);
+  };
+
+  const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
+  const back = () => setStep((s) => Math.max(s - 1, 0));
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>QUALITY BOOSTER</Text>
+        <Text style={styles.title}>Make rough clips hit harder.</Text>
+        <Text style={styles.subtitle}>Sharpen the video, prep the TikTok cut, then generate caption ideas before export.</Text>
+      </View>
+
+      <View style={styles.progressCard}>
+        <View style={styles.progressTop}>
+          <Text style={styles.progressLabel}>{steps[step]}</Text>
+          <Text style={styles.progressPercent}>{completion}%</Text>
+        </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${completion}%` }]} />
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stepRow}>
+          {steps.map((label, index) => (
+            <Pressable
+              key={label}
+              onPress={() => setStep(index)}
+              accessibilityRole="button"
+              style={[styles.stepPill, index === step && styles.stepPillActive]}
+            >
+              <Text style={[styles.stepPillText, index === step && styles.stepPillTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        {step === 0 && (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>Choose a video from your device to start enhancing.</Text>
+            <Text style={styles.panelNote}>Select a video from iPhone Photos, or start with a saved draft.</Text>
+            <Pressable style={styles.primaryButton} onPress={pickVideo} accessibilityRole="button">
+              <Ionicons name="film" size={20} color="#ffffff" />
+              <Text style={styles.primaryButtonText}>Choose from Photos</Text>
+            </Pressable>
+            {selectedVideo?.uri && <Text style={styles.pickedNote}>Selected from your device: {selectedVideo.title}</Text>}
+            <View style={styles.cardStack}> 
+              {sampleVideos.map((video) => {
+                const active = selectedVideo?.title === video.title;
+                return (
+                  <Pressable
+                    key={video.title}
+                    onPress={() => {
+                      setSelectedVideo(video);
+                      setVideoName(video.title);
+                      setManualSource(video.source);
+                    }}
+                    accessibilityRole="button"
+                    style={[styles.videoCard, active && styles.videoCardActive]}
+                  >
+                    <View style={styles.videoInfo}>
+                      <Ionicons name="videocam" size={20} color="#ef4444" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.videoTitle}>{video.title}</Text>
+                        <Text style={styles.videoMeta}>{video.duration} · {video.format} · {video.quality}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.videoSource}>{video.source}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <TextInput
+              value={videoName}
+              onChangeText={setVideoName}
+              placeholder="Clip name"
+              placeholderTextColor="#737373"
+              style={styles.input}
+            />
+            <TextInput
+              value={manualSource}
+              onChangeText={setManualSource}
+              placeholder="Where it came from on your device"
+              placeholderTextColor="#737373"
+              style={styles.input}
+            />
+            <Pressable style={styles.primaryButton} onPress={updateVideoFromManual} accessibilityRole="button">
+              <Text style={styles.primaryButtonText}>Use this video</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {step === 1 && (
+          <View style={styles.panel}>
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.panelTitle}>Enhance clarity and sharpness to make the video look better.</Text>
+                <Text style={styles.panelNote}>Automatic enhance starts on by default.</Text>
+              </View>
+              <Switch value={autoEnhance} onValueChange={setAutoEnhance} thumbColor="#ffffff" trackColor={{ false: '#3f3f46', true: '#ef4444' }} />
+            </View>
+            <Metric label="Sharpness" value={sharpness} onDown={() => setSharpness((v) => Math.max(0, v - 6))} onUp={() => setSharpness((v) => Math.min(100, v + 6))} />
+            <Metric label="Clarity" value={clarity} onDown={() => setClarity((v) => Math.max(0, v - 6))} onUp={() => setClarity((v) => Math.min(100, v + 6))} />
+            <Metric label="Noise Reduction" value={noiseReduction} onDown={() => setNoiseReduction((v) => Math.max(0, v - 6))} onUp={() => setNoiseReduction((v) => Math.min(100, v + 6))} />
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryTitle}>Enhance profile</Text>
+              <Text style={styles.summaryText}>{autoEnhance ? 'Auto mode will prioritize clean detail and punchier edges.' : 'Manual mode keeps your custom tuning.'}</Text>
+            </View>
+          </View>
+        )}
+
+        {step === 2 && (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>Prepare a TikTok-friendly version with crop and export guidance.</Text>
+            <Text style={styles.panelNote}>Default crop stays Original, not 9:16.</Text>
+            <OptionRow label="Crop" value={cropMode} options={['Original', '9:16', '1:1', '16:9']} onChange={(value) => setCropMode(value as typeof cropMode)} />
+            <OptionRow label="Export" value={exportFormat} options={['TikTok MP4', 'High Bitrate MOV']} onChange={(value) => setExportFormat(value as typeof exportFormat)} />
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryTitle}>TikTok Studio</Text>
+              <Text style={styles.summaryText}>Keep faces centered, leave headroom for captions, and avoid pushing the crop tighter than the main subject.</Text>
+            </View>
+            <Pressable style={styles.primaryButton} onPress={startRender} accessibilityRole="button">
+              <Text style={styles.primaryButtonText}>Queue TikTok render</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {step === 3 && (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>Create caption and hashtag suggestions to help your post get attention.</Text>
+            <Text style={styles.panelNote}>Suggestions are automatic.</Text>
+            <Pressable style={styles.primaryButton} onPress={buildCaptions} accessibilityRole="button">
+              <Text style={styles.primaryButtonText}>Generate caption ideas</Text>
+            </Pressable>
+            {loadingSuggestions && <ActivityIndicator style={{ marginTop: 18 }} color="#ef4444" />}
+            {suggestions && (
+              <View style={styles.cardStack}>
+                <View style={styles.outputCard}>
+                  <Text style={styles.outputLabel}>Hook</Text>
+                  <Text style={styles.outputText}>{suggestions.hook}</Text>
+                </View>
+                <View style={styles.outputCard}>
+                  <Text style={styles.outputLabel}>Caption</Text>
+                  <Text style={styles.outputText}>{suggestions.caption}</Text>
+                </View>
+                <View style={styles.outputCard}>
+                  <Text style={styles.outputLabel}>Hashtags</Text>
+                  <Text style={styles.outputText}>{suggestions.hashtags.join(' ')}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {step === 4 && (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>Adjust final export settings and start rendering the improved video.</Text>
+            <OptionRow label="Resolution" value={resolution} options={['1080p', '4K']} onChange={(value) => setResolution(value as typeof resolution)} />
+            <OptionRow label="Frame rate" value={fps} options={['30 FPS', '60 FPS']} onChange={(value) => setFps(value as typeof fps)} />
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryTitle}>Render status</Text>
+              <Text style={styles.summaryText}>{renderStatus}</Text>
+              {!!suggestions?.exportNote && <Text style={[styles.summaryText, { marginTop: 10 }]}>{suggestions.exportNote}</Text>}
+            </View>
+            <View style={styles.exportCard}>
+              <Text style={styles.exportTitle}>{currentVideo.title}</Text>
+              <Text style={styles.exportMeta}>{resolution} · {fps} · {cropMode} · {exportFormat}</Text>
+              <Text style={styles.exportMeta}>Source: {currentVideo.source}</Text>
+            </View>
+          </View>
+        )}
+
+        {!!error && <Text style={styles.error}>{error}</Text>}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Pressable onPress={back} accessibilityRole="button" style={[styles.secondaryButton, step === 0 && styles.secondaryButtonDisabled]} disabled={step === 0}>
+          <Text style={styles.secondaryButtonText}>Back</Text>
+        </Pressable>
+        <Pressable onPress={next} accessibilityRole="button" style={styles.primaryButtonCompact}>
+          <Text style={styles.primaryButtonText}>{step === steps.length - 1 ? 'Review' : 'Next'}</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function Metric({ label, value, onDown, onUp }: { label: string; value: number; onDown: () => void; onUp: () => void }) {
+  return (
+    <View style={styles.metricRow}>
+      <View>
+        <Text style={styles.metricLabel}>{label}</Text>
+        <Text style={styles.metricValue}>{value}%</Text>
+      </View>
+      <View style={styles.metricControls}>
+        <Pressable style={styles.metricButton} onPress={onDown} accessibilityRole="button">
+          <Ionicons name="remove" size={18} color="#ffffff" />
+        </Pressable>
+        <Pressable style={styles.metricButton} onPress={onUp} accessibilityRole="button">
+          <Ionicons name="add" size={18} color="#ffffff" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function OptionRow({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <View style={styles.optionBlock}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <View style={styles.optionRow}>
+        {options.map((option) => {
+          const active = option === value;
+          return (
+            <Pressable key={option} onPress={() => onChange(option)} accessibilityRole="button" style={[styles.optionChip, active && styles.optionChipActive]}>
+              <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>{option}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#111111' },
+  header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
+  eyebrow: { color: '#ef4444', fontSize: 12, fontWeight: '800', letterSpacing: 1.4 },
+  title: { color: '#ffffff', fontSize: 30, fontWeight: '900', lineHeight: 34, marginTop: 10 },
+  subtitle: { color: '#d4d4d8', fontSize: 15, lineHeight: 22, marginTop: 10 },
+  progressCard: { marginHorizontal: 20, backgroundColor: '#191919', borderRadius: 22, padding: 16, borderWidth: 1, borderColor: '#27272a' },
+  progressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressLabel: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
+  progressPercent: { color: '#ef4444', fontSize: 16, fontWeight: '800' },
+  progressTrack: { height: 8, borderRadius: 999, backgroundColor: '#2a2a2a', marginTop: 12, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#ef4444' },
+  stepRow: { gap: 10, paddingTop: 14 },
+  stepPill: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, backgroundColor: '#222222' },
+  stepPillActive: { backgroundColor: '#ef4444' },
+  stepPillText: { color: '#a1a1aa', fontSize: 13, fontWeight: '700' },
+  stepPillTextActive: { color: '#ffffff' },
+  content: { padding: 20, paddingBottom: 120, gap: 16 },
+  panel: { backgroundColor: '#191919', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#27272a', gap: 14 },
+  panelTitle: { color: '#ffffff', fontSize: 22, fontWeight: '900', lineHeight: 28 },
+  panelNote: { color: '#a1a1aa', fontSize: 14, lineHeight: 20 },
+  cardStack: { gap: 12 },
+  videoCard: { padding: 14, borderRadius: 18, backgroundColor: '#111111', borderWidth: 1, borderColor: '#2f2f2f', gap: 10 },
+  videoCardActive: { borderColor: '#ef4444' },
+  videoInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  videoTitle: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  videoMeta: { color: '#a1a1aa', fontSize: 13, marginTop: 2 },
+  videoSource: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
+  input: { backgroundColor: '#111111', color: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#2f2f2f', paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
+  primaryButton: { backgroundColor: '#ef4444', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flexDirection: 'row', gap: 9 },
+  pickedNote: { color: '#fca5a5', fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  primaryButtonCompact: { backgroundColor: '#ef4444', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flex: 1 },
+  primaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  secondaryButton: { backgroundColor: '#222222', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flex: 1 },
+  secondaryButtonDisabled: { opacity: 0.45 },
+  secondaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  rowBetween: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111111', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: '#2f2f2f' },
+  metricLabel: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  metricValue: { color: '#ef4444', fontSize: 24, fontWeight: '900', marginTop: 4 },
+  metricControls: { flexDirection: 'row', gap: 10 },
+  metricButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' },
+  optionBlock: { gap: 10 },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  optionChip: { paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, backgroundColor: '#111111', borderWidth: 1, borderColor: '#2f2f2f' },
+  optionChipActive: { backgroundColor: '#ef4444', borderColor: '#ef4444' },
+  optionChipText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  optionChipTextActive: { color: '#ffffff' },
+  summaryBox: { backgroundColor: '#111111', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2f2f2f' },
+  summaryTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800', marginBottom: 8 },
+  summaryText: { color: '#d4d4d8', fontSize: 14, lineHeight: 21 },
+  outputCard: { backgroundColor: '#111111', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2f2f2f' },
+  outputLabel: { color: '#ef4444', fontSize: 13, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase' },
+  outputText: { color: '#ffffff', fontSize: 15, lineHeight: 22 },
+  exportCard: { backgroundColor: '#ef4444', borderRadius: 20, padding: 18, gap: 6 },
+  exportTitle: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
+  exportMeta: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  error: { color: '#fca5a5', fontSize: 14, lineHeight: 20 },
+  footer: { position: 'absolute', left: 20, right: 20, bottom: 20, flexDirection: 'row', gap: 12 },
+});

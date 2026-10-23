@@ -38,6 +38,67 @@ const routes = {
   'GET /health': (req, res) => json(res, { status: 'ok', uptime: process.uptime(), release: currentRelease() }),
 
   'GET /api/projects': (req, res) => json(res, store.read('projects', [])),
+  'GET /api/tiktok/status': (req, res) => {
+    const account = store.read('tiktok-account', null);
+    json(res, { connected: Boolean(account && account.accessToken), username: account?.username || null, scopes: account?.scopes || [] });
+  },
+  'GET /api/tiktok/connect': (req, res) => {
+    if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) return json(res, { error: 'TikTok connection is not configured yet.' }, 503);
+    const state = crypto.randomBytes(24).toString('hex');
+    store.write('tiktok-oauth-state', { state, expiresAt: Date.now() + 10 * 60 * 1000 });
+    const redirectUri = `${publicOrigin(req).origin}/api/tiktok/callback`;
+    const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
+    url.searchParams.set('client_key', process.env.TIKTOK_CLIENT_KEY);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('scope', 'user.info.basic,video.publish');
+    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('state', state);
+    res.writeHead(302, { Location: url.toString(), 'Cache-Control': 'no-store' });
+    res.end();
+  },
+  'GET /api/tiktok/callback': async (req, res) => {
+    const url = new URL(req.url, 'http://localhost');
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    const saved = store.read('tiktok-oauth-state', null);
+    if (!code || !saved || state !== saved.state || Date.now() > saved.expiresAt) return oauthPage(res, 'TikTok connection failed', 'This connection request expired. Return to Quality Booster and try again.');
+    try {
+      const redirectUri = `${publicOrigin(req).origin}/api/tiktok/callback`;
+      const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY, client_secret: process.env.TIKTOK_CLIENT_SECRET, code, grant_type: 'authorization_code', redirect_uri: redirectUri }).toString(),
+      });
+      const token = await tokenResponse.json();
+      if (!tokenResponse.ok || !token.access_token) throw new Error(token.error_description || 'TikTok did not return access.');
+      store.write('tiktok-account', { accessToken: token.access_token, refreshToken: token.refresh_token, expiresIn: token.expires_in, openId: token.open_id, scopes: String(token.scope || 'user.info.basic,video.publish').split(','), connectedAt: new Date().toISOString() });
+      store.write('tiktok-oauth-state', null);
+      oauthPage(res, 'TikTok connected', 'Return to Quality Booster. Your account is connected; every post will still ask for your confirmation.');
+    } catch (err) {
+      oauthPage(res, 'TikTok connection failed', err.message || 'Try again from Quality Booster.');
+    }
+  },
+  'GET /api/trends': (req, res) => {
+    const niche = String(new URL(req.url, 'http://localhost').searchParams.get('niche') || 'Practical basketball').slice(0, 80);
+    const library = {
+      'Practical basketball': [
+        { title: 'Three-move warmup with no gym', angle: 'Fast cuts, on-screen reps, first shot in 1 second', tags: ['#basketballtraining', '#hooptok', '#ballislife'] },
+        { title: 'Fix your handle in 10 minutes', angle: 'Before/after drill edit with a hard opening miss', tags: ['#basketballtips', '#handles', '#basketball'] },
+        { title: 'Game-day footwork breakdown', angle: 'Pause-frame the pivot, then show it at full speed', tags: ['#basketballdrills', '#hoopers', '#training'] },
+      ],
+      'Roblox edits': [
+        { title: 'Cleanest clip wins', angle: 'Show the payoff first, then rewind to the setup', tags: ['#robloxedit', '#roblox', '#gaming'] },
+        { title: 'Velocity transition edit', angle: 'Hit each beat change with a scene change', tags: ['#editingtips', '#robloxvideo', '#fyp'] },
+        { title: 'One map, three cinematic angles', angle: 'Match camera swings to a tight beat drop', tags: ['#robloxcreator', '#gamingedit', '#roblox'] },
+      ],
+    };
+    const items = library[niche] || [
+      { title: `${niche} quick-win edit`, angle: 'Show the end result in the first second, then explain the process.', tags: ['#tiktoktips', '#creator', '#fyp'] },
+      { title: `${niche} before and after`, angle: 'Contrast the rough cut with the polished version.', tags: ['#contentcreator', '#videoedit', '#tiktok'] },
+      { title: `${niche} five-second hook`, angle: 'Use a bold first line and keep cuts moving.', tags: ['#creatorideas', '#trending', '#fyp'] },
+    ];
+    json(res, { niche, items, updatedAt: new Date().toISOString(), source: 'Creator trend playbook' });
+  },
   'POST /api/caption-suggestions': async (req, res) => {
     const body = await readBody(req);
     const fallback = {
@@ -112,6 +173,14 @@ function json(res, data, status = 200, headers = {}) {
   const payload = JSON.stringify(data);
   res.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), ...headers });
   res.end(payload);
+}
+
+function oauthPage(res, title, message) {
+  const safeTitle = String(title).replace(/[<>&]/g, '');
+  const safeMessage = String(message).replace(/[<>&]/g, '');
+  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title><style>body{margin:0;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}.card{max-width:360px;background:#191919;border:1px solid #333;border-radius:24px;padding:28px}h1{font-size:28px;margin:0 0 12px;color:#ef4444}p{line-height:1.5;color:#ddd;margin:0}</style></head><body><main class="card"><h1>${safeTitle}</h1><p>${safeMessage}</p></main></body></html>`;
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(html);
 }
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
