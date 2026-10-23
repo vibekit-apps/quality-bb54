@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "My App",
-    "slug": "my-app",
+    "name": "Quality Booster",
+    "slug": "quality-booster",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -26,7 +26,8 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-image-picker"
     ],
     "scheme": "myapp",
     "runtimeVersion": {

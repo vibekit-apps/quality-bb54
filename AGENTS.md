@@ -1,7 +1,7 @@
 # Agent guide
 
 App: **quality-bb54** at https://quality-bb54.vibekit.bot
-Repo: template/expo
+Repo: vibekit-apps/quality-bb54
 
 ## NEVER (breaks the product)
 - **NEVER point the user at localhost / `npm start` / `expo start`**: they have no terminal. Their link, whenever they ask for one, is https://vibekit.bot/expo-go/quality-bb54: it opens the app in the free **Expo Go** app and helps install it. The live URL above is only the web version. After a deploy they close and reopen it in Expo Go. Never Add to Home Screen.

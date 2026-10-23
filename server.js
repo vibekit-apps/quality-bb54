@@ -37,14 +37,61 @@ const MIME = {
 const routes = {
   'GET /health': (req, res) => json(res, { status: 'ok', uptime: process.uptime(), release: currentRelease() }),
 
-  // Example data. Replace with your app's own.
-  'GET /api/items': (req, res) => json(res, store.read('items')),
-  'POST /api/items': async (req, res) => {
-    const { text } = await readBody(req);
-    if (!text || !String(text).trim()) return json(res, { error: 'Write something first' }, 400);
-    const item = { id: crypto.randomUUID(), text: String(text).trim().slice(0, 500), createdAt: new Date().toISOString() };
-    store.write('items', [item, ...store.read('items')]);
-    json(res, item, 201);
+  'GET /api/projects': (req, res) => json(res, store.read('projects', [])),
+  'POST /api/caption-suggestions': async (req, res) => {
+    const body = await readBody(req);
+    const fallback = {
+      hook: `Sharp ${String(body.title || 'video')} cut with a cleaner finish.`,
+      caption: `Cleaned up ${String(body.title || 'this clip')} and pushed the detail so every frame lands harder on TikTok.`,
+      hashtags: ['#tiktokgrowth', '#videoboost', '#fyp', '#contentcreator', '#qualityedit'],
+      exportNote: `Best export: ${String(body.resolution || '1080p')} at ${String(body.fps || '30 FPS')} with ${String(body.cropMode || 'Original')} crop.`,
+    };
+
+    try {
+      if (!process.env.VIBEKIT_AI_URL || !process.env.VIBEKIT_AI_TOKEN) return json(res, fallback);
+      const prompt = [
+        'You write short TikTok caption packs for video creators.',
+        'Return strict JSON only with keys: hook, caption, hashtags, exportNote.',
+        'hashtags must be an array of exactly 5 hashtag strings.',
+        'Tone: bold, short, punchy, no emojis.',
+        `Video title: ${String(body.title || 'Untitled clip')}`,
+        `Duration: ${String(body.duration || '00:15')}`,
+        `Source: ${String(body.source || 'Device import')}`,
+        `Quality target: ${String(body.quality || '1080p')}`,
+        `Sharpness: ${String(body.sharpness || 0)}`,
+        `Clarity: ${String(body.clarity || 0)}`,
+        `Noise reduction: ${String(body.noiseReduction || 0)}`,
+        `Crop mode: ${String(body.cropMode || 'Original')}`,
+        `Export format: ${String(body.exportFormat || 'TikTok MP4')}`,
+        `Frame rate: ${String(body.fps || '30 FPS')}`,
+        `Resolution: ${String(body.resolution || '1080p')}`,
+      ].join('\n');
+
+      const r = await fetch(process.env.VIBEKIT_AI_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.VIBEKIT_AI_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'You are a concise TikTok growth copywriter. Output JSON only.' },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      });
+      const data = await r.json().catch(() => null);
+      const text = data && typeof data.text === 'string' ? data.text : '';
+      const parsed = JSON.parse(text);
+      return json(res, {
+        hook: String(parsed.hook || fallback.hook),
+        caption: String(parsed.caption || fallback.caption),
+        hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.slice(0, 5).map((tag) => String(tag)) : fallback.hashtags,
+        exportNote: String(parsed.exportNote || fallback.exportNote),
+      });
+    } catch {
+      return json(res, fallback);
+    }
   },
 
   // Accounts (lib/auth.js). The app keeps the returned token (lib/api.ts).

@@ -6,13 +6,16 @@
 - Created: 2026-10-23T15:26:26.551Z
 
 ## Architecture
-(document key decisions here as you build)
+- Single-screen Expo Router flow in `app/index.tsx` with five staged panels for Video Picker, Quality Enhance, TikTok Studio, Caption Builder, and Export Options.
+- Server route `POST /api/caption-suggestions` uses built-in runtime AI when available and falls back to deterministic local copy.
 
 ## Known Issues
-(none yet)
+- Actual video rendering/export remains unimplemented; v1 uses export guidance.
+- Device video selection is implemented with `expo-image-picker`, with the native permission prompt.
 
 ## Decisions
-(none yet)
+- Kept the app sign-in free and mobile-first.
+- Automatic enhance defaults on; TikTok crop defaults to Original.
 
 ## How to Use Memory
 - Update this file with important decisions, architecture choices, and lessons
