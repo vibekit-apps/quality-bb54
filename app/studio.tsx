@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -173,8 +174,9 @@ export default function Home() {
       if (status < 200 || status >= 300 || !result.secure_url) {
         throw new Error(result.error?.message || `Upload failed: ${status} ${body || 'Unknown render error'}`);
       }
-      setDownloadUrl(result.secure_url);
-      setRenderStatus('Enhanced video is ready to review and download.');
+      const highQualityUrl = result.secure_url.replace('/upload/', '/upload/f_mp4,q_auto:best,vc_h264/');
+      setDownloadUrl(highQualityUrl);
+      setRenderStatus('High-quality render is ready to save to Photos.');
       if (!suggestions) await buildCaptions();
     } catch (e) {
       setRenderStatus('Render did not complete.');
@@ -189,7 +191,25 @@ export default function Home() {
       await renderVideo();
       return;
     }
-    await Linking.openURL(downloadUrl);
+    setError('');
+    try {
+      if (Platform.OS === 'web') {
+        await Linking.openURL(downloadUrl);
+        return;
+      }
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        setError('Allow Photos access in iPhone Settings to save the enhanced video.');
+        return;
+      }
+      setRenderStatus('Saving enhanced video to Photos…');
+      const localFile = `${FileSystem.cacheDirectory}enhanced-${Date.now()}.mp4`;
+      const saved = await FileSystem.downloadAsync(downloadUrl, localFile);
+      await MediaLibrary.saveToLibraryAsync(saved.uri);
+      setRenderStatus('Enhanced video saved to your iPhone Photos library.');
+    } catch (e) {
+      setError((e as Error).message || 'Could not save the enhanced video.');
+    }
   };
 
   const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -380,7 +400,7 @@ export default function Home() {
               {rendering ? <ActivityIndicator color="#ffffff" /> : <Ionicons name={downloadUrl ? 'download-outline' : 'cloud-upload-outline'} size={20} color="#ffffff" />}
               <Text style={styles.primaryButtonText}>{rendering ? 'Rendering enhanced video…' : downloadUrl ? 'Download enhanced video' : 'Start render'}</Text>
             </Pressable>
-            <Text style={styles.downloadNote}>{downloadUrl ? 'Your enhanced video is ready. Tap Download enhanced video to save it.' : 'Start render uploads the selected video securely, then prepares it for download.'}</Text>
+            <Text style={styles.downloadNote}>{downloadUrl ? 'Your high-quality video is ready. Tap Download enhanced video to save it to Photos.' : 'Start render uploads the selected video securely, then prepares it for download.'}</Text>
             {downloadUrl && (
               <View style={styles.resultPanel}>
                 <View style={styles.resultHeader}><Ionicons name="checkmark-circle" size={22} color="#ef4444" /><Text style={styles.resultTitle}>Render result</Text></View>

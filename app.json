@@ -27,7 +27,8 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-media-library"
     ],
     "scheme": "myapp",
     "runtimeVersion": {
