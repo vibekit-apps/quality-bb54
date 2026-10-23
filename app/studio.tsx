@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 
@@ -20,6 +20,15 @@ type SuggestionResponse = {
   hashtags: string[];
   hook: string;
   exportNote: string;
+};
+
+type RenderSignature = {
+  cloudName: string;
+  apiKey: string;
+  uploadPreset: string;
+  timestamp: number;
+  publicId: string;
+  signature: string;
 };
 
 const steps = ['Video Picker', 'Quality Enhance', 'Format & Export', 'Caption Builder', 'Export Options'] as const;
@@ -48,6 +57,8 @@ export default function Home() {
   const [error, setError] = useState('');
   const [renderStatus, setRenderStatus] = useState('Not queued yet. Choose your final export settings, then add this video to the render queue.');
   const [renderQueued, setRenderQueued] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   const completion = useMemo(() => Math.round(((step + 1) / steps.length) * 100), [step]);
 
@@ -112,12 +123,48 @@ export default function Home() {
 
   const startRender = () => {
     setRenderQueued(true);
-    setRenderStatus(`Queued: ${currentVideo.title} will be enhanced at ${resolution}, ${fps}, using ${cropMode} crop.`);
+    setDownloadUrl(null);
+    setRenderStatus(`Queued: ${currentVideo.title} is ready to upload for enhancement at ${resolution}, ${fps}, using ${cropMode} crop.`);
     setStep(4);
   };
 
-  const downloadEnhancedVideo = () => {
-    setError('Video rendering is not connected yet, so there is no enhanced file to download. Your render settings are saved in the queue.');
+  const renderVideo = async () => {
+    if (!selectedVideo?.uri) {
+      setError('Choose a real video from iPhone Photos before starting the render.');
+      setStep(0);
+      return;
+    }
+    setRendering(true);
+    setError('');
+    setRenderStatus('Uploading your video to the secure render queue…');
+    try {
+      const config = await api<RenderSignature>('POST', '/api/render/signature', { title: currentVideo.title });
+      const form = new FormData();
+      form.append('file', { uri: selectedVideo.uri, type: 'video/mp4', name: `${currentVideo.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'video'}.mp4` } as any);
+      form.append('api_key', config.apiKey);
+      form.append('timestamp', String(config.timestamp));
+      form.append('signature', config.signature);
+      form.append('upload_preset', config.uploadPreset);
+      form.append('public_id', config.publicId);
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${config.cloudName}/video/upload`, { method: 'POST', body: form });
+      const result = await response.json();
+      if (!response.ok || !result.secure_url) throw new Error(result.error?.message || 'The render service could not process this video.');
+      setDownloadUrl(result.secure_url);
+      setRenderStatus('Enhanced video is ready to download.');
+    } catch (e) {
+      setRenderStatus('Render did not complete.');
+      setError((e as Error).message);
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  const downloadEnhancedVideo = async () => {
+    if (!downloadUrl) {
+      await renderVideo();
+      return;
+    }
+    await Linking.openURL(downloadUrl);
   };
 
   const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -304,11 +351,11 @@ export default function Home() {
               <Text style={styles.exportMeta}>{resolution} · {fps} · {cropMode} · {exportFormat}</Text>
               <Text style={styles.exportMeta}>Source: {currentVideo.source}</Text>
             </View>
-            <Pressable style={[styles.downloadButton, !renderQueued && styles.downloadButtonDisabled]} onPress={downloadEnhancedVideo} accessibilityRole="button">
-              <Ionicons name="download-outline" size={20} color="#ffffff" />
-              <Text style={styles.primaryButtonText}>Download enhanced video</Text>
+            <Pressable style={[styles.downloadButton, (!renderQueued || rendering) && styles.downloadButtonDisabled]} onPress={downloadEnhancedVideo} accessibilityRole="button" disabled={!renderQueued || rendering}>
+              {rendering ? <ActivityIndicator color="#ffffff" /> : <Ionicons name={downloadUrl ? 'download-outline' : 'cloud-upload-outline'} size={20} color="#ffffff" />}
+              <Text style={styles.primaryButtonText}>{rendering ? 'Rendering enhanced video…' : downloadUrl ? 'Download enhanced video' : 'Start render'}</Text>
             </Pressable>
-            <Text style={styles.downloadNote}>Downloads unlock when the actual video renderer is connected. The queue and export settings are ready.</Text>
+            <Text style={styles.downloadNote}>{downloadUrl ? 'Your enhanced video is ready. Tap Download enhanced video to save it.' : 'Start render uploads the selected video securely, then prepares it for download.'}</Text>
           </View>
         )}
 

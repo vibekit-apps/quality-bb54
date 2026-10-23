@@ -38,6 +38,15 @@ const routes = {
   'GET /health': (req, res) => json(res, { status: 'ok', uptime: process.uptime(), release: currentRelease() }),
 
   'GET /api/projects': (req, res) => json(res, store.read('projects', [])),
+  'POST /api/render/signature': async (req, res) => {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_UPLOAD_PRESET || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) return json(res, { error: 'Video render service is not configured.' }, 503);
+    const body = await readBody(req);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const publicId = `d4v1dflow/${String(body.title || 'enhanced-video').replace(/[^a-z0-9_-]/gi, '-').toLowerCase().slice(0, 60)}-${timestamp}`;
+    const toSign = `public_id=${publicId}&timestamp=${timestamp}&upload_preset=${process.env.CLOUDINARY_UPLOAD_PRESET}${process.env.CLOUDINARY_API_SECRET}`;
+    const signature = crypto.createHash('sha1').update(toSign).digest('hex');
+    json(res, { cloudName: process.env.CLOUDINARY_CLOUD_NAME, apiKey: process.env.CLOUDINARY_API_KEY, uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET, timestamp, publicId, signature });
+  },
   'GET /api/trends': (req, res) => {
     const niche = String(new URL(req.url, 'http://localhost').searchParams.get('niche') || 'Practical basketball').slice(0, 80);
     const library = {
