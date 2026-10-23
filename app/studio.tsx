@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -138,15 +139,23 @@ export default function Home() {
     setRenderStatus('Uploading your video to the secure render queue…');
     try {
       const config = await api<RenderSignature>('POST', '/api/render/signature', { title: currentVideo.title });
-      const form = new FormData();
-      form.append('file', { uri: selectedVideo.uri, type: 'video/mp4', name: `${currentVideo.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'video'}.mp4` } as any);
-      form.append('api_key', config.apiKey);
-      form.append('timestamp', String(config.timestamp));
-      form.append('signature', config.signature);
-      form.append('public_id', config.publicId);
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${config.cloudName}/video/upload`, { method: 'POST', body: form });
-      const result = await response.json();
-      if (!response.ok || !result.secure_url) throw new Error(result.error?.message || 'The render service could not process this video.');
+      const fileName = `${currentVideo.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'video'}.mp4`;
+      const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudName}/video/upload`;
+      const response = await FileSystem.uploadAsync(uploadUrl, selectedVideo.uri, {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType: 'video/mp4',
+        parameters: {
+          api_key: config.apiKey,
+          timestamp: String(config.timestamp),
+          signature: config.signature,
+          public_id: config.publicId,
+          filename_override: fileName,
+        },
+      });
+      const result = JSON.parse(response.body || '{}');
+      if (response.status < 200 || response.status >= 300 || !result.secure_url) throw new Error(result.error?.message || 'The render service could not process this video.');
       setDownloadUrl(result.secure_url);
       setRenderStatus('Enhanced video is ready to review and download.');
       if (!suggestions) await buildCaptions();
