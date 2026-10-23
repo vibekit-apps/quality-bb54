@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -193,22 +192,10 @@ export default function Home() {
     }
     setError('');
     try {
-      if (Platform.OS === 'web') {
-        await Linking.openURL(downloadUrl);
-        return;
-      }
-      const permission = await MediaLibrary.requestPermissionsAsync();
-      if (!permission.granted) {
-        setError('Allow Photos access in iPhone Settings to save the enhanced video.');
-        return;
-      }
-      setRenderStatus('Saving enhanced video to Photos…');
-      const localFile = `${FileSystem.cacheDirectory}enhanced-${Date.now()}.mp4`;
-      const saved = await FileSystem.downloadAsync(downloadUrl, localFile);
-      await MediaLibrary.saveToLibraryAsync(saved.uri);
-      setRenderStatus('Enhanced video saved to your iPhone Photos library.');
+      await Linking.openURL(downloadUrl);
+      setRenderStatus('Opened the high-quality video file for download.');
     } catch (e) {
-      setError((e as Error).message || 'Could not save the enhanced video.');
+      setError((e as Error).message || 'Could not open the enhanced video.');
     }
   };
 
@@ -400,7 +387,7 @@ export default function Home() {
               {rendering ? <ActivityIndicator color="#ffffff" /> : <Ionicons name={downloadUrl ? 'download-outline' : 'cloud-upload-outline'} size={20} color="#ffffff" />}
               <Text style={styles.primaryButtonText}>{rendering ? 'Rendering enhanced video…' : downloadUrl ? 'Download enhanced video' : 'Start render'}</Text>
             </Pressable>
-            <Text style={styles.downloadNote}>{downloadUrl ? 'Your high-quality video is ready. Tap Download enhanced video to save it to Photos.' : 'Start render uploads the selected video securely, then prepares it for download.'}</Text>
+            <Text style={styles.downloadNote}>{downloadUrl ? 'Your high-quality video is ready. Tap Download enhanced video to open the finished MP4.' : 'Start render uploads the selected video securely, then prepares it for download.'}</Text>
             {downloadUrl && (
               <View style={styles.resultPanel}>
                 <View style={styles.resultHeader}><Ionicons name="checkmark-circle" size={22} color="#ef4444" /><Text style={styles.resultTitle}>Render result</Text></View>
