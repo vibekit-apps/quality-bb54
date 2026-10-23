@@ -22,7 +22,7 @@ type SuggestionResponse = {
   exportNote: string;
 };
 
-const steps = ['Video Picker', 'Quality Enhance', 'TikTok Studio', 'Caption Builder', 'Export Options'] as const;
+const steps = ['Video Picker', 'Quality Enhance', 'Format & Export', 'Caption Builder', 'Export Options'] as const;
 
 const sampleVideos: VideoDraft[] = [
   { title: 'Glow-up transition', duration: '00:18', format: 'MP4', quality: '720p', source: 'Camera Roll' },
@@ -46,7 +46,8 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState<SuggestionResponse | null>(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [error, setError] = useState('');
-  const [renderStatus, setRenderStatus] = useState('Automatic enhance is ready.');
+  const [renderStatus, setRenderStatus] = useState('Not queued yet. Choose your final export settings, then add this video to the render queue.');
+  const [renderQueued, setRenderQueued] = useState(false);
 
   const completion = useMemo(() => Math.round(((step + 1) / steps.length) * 100), [step]);
 
@@ -110,8 +111,13 @@ export default function Home() {
   };
 
   const startRender = () => {
-    setRenderStatus(`Render queued: ${resolution}, ${fps}, ${exportFormat}, ${cropMode} crop.`);
+    setRenderQueued(true);
+    setRenderStatus(`Queued: ${currentVideo.title} will be enhanced at ${resolution}, ${fps}, using ${cropMode} crop.`);
     setStep(4);
+  };
+
+  const downloadEnhancedVideo = () => {
+    setError('Video rendering is not connected yet, so there is no enhanced file to download. Your render settings are saved in the queue.');
   };
 
   const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -132,7 +138,7 @@ export default function Home() {
             </Pressable>
           </Link>
         </View>
-        <Text style={styles.subtitle}>Pick a real video from Photos, make it cleaner, then build the TikTok post around it.</Text>
+        <Text style={styles.subtitle}>Pick a real video from Photos, make it cleaner, then get a strong caption and hashtags from its edit details.</Text>
       </View>
 
       <View style={styles.progressCard}>
@@ -242,26 +248,26 @@ export default function Home() {
 
         {step === 2 && (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Prepare a TikTok-friendly version with crop and export guidance.</Text>
-            <Text style={styles.panelNote}>Default crop stays Original, not 9:16.</Text>
+            <Text style={styles.panelTitle}>Set the crop and export style for your enhanced video.</Text>
+            <Text style={styles.panelNote}>Default crop stays Original, so your video keeps its framing.</Text>
             <OptionRow label="Crop" value={cropMode} options={['Original', '9:16', '1:1', '16:9']} onChange={(value) => setCropMode(value as typeof cropMode)} />
             <OptionRow label="Export" value={exportFormat} options={['TikTok MP4', 'High Bitrate MOV']} onChange={(value) => setExportFormat(value as typeof exportFormat)} />
             <View style={styles.summaryBox}>
-              <Text style={styles.summaryTitle}>TikTok Studio</Text>
+              <Text style={styles.summaryTitle}>Format guide</Text>
               <Text style={styles.summaryText}>Keep faces centered, leave headroom for captions, and avoid pushing the crop tighter than the main subject.</Text>
             </View>
             <Pressable style={styles.primaryButton} onPress={startRender} accessibilityRole="button">
-              <Text style={styles.primaryButtonText}>Queue TikTok render</Text>
+              <Text style={styles.primaryButtonText}>Add to render queue</Text>
             </Pressable>
           </View>
         )}
 
         {step === 3 && (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Create caption and hashtag suggestions to help your post get attention.</Text>
-            <Text style={styles.panelNote}>Suggestions are automatic.</Text>
+            <Text style={styles.panelTitle}>Get a caption and hashtag pack from your enhanced video.</Text>
+            <Text style={styles.panelNote}>Suggestions are generated automatically from your clip and enhancement settings.</Text>
             <Pressable style={styles.primaryButton} onPress={buildCaptions} accessibilityRole="button">
-              <Text style={styles.primaryButtonText}>Generate caption ideas</Text>
+              <Text style={styles.primaryButtonText}>Analyse video and suggest hashtags</Text>
             </Pressable>
             {loadingSuggestions && <ActivityIndicator style={{ marginTop: 18 }} color="#ef4444" />}
             {suggestions && (
@@ -285,11 +291,11 @@ export default function Home() {
 
         {step === 4 && (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Adjust final export settings and start rendering the improved video.</Text>
+            <Text style={styles.panelTitle}>Render queue</Text>
             <OptionRow label="Resolution" value={resolution} options={['1080p', '4K']} onChange={(value) => setResolution(value as typeof resolution)} />
             <OptionRow label="Frame rate" value={fps} options={['30 FPS', '60 FPS']} onChange={(value) => setFps(value as typeof fps)} />
             <View style={styles.summaryBox}>
-              <Text style={styles.summaryTitle}>Render status</Text>
+              <View style={styles.outputHeading}><Ionicons name={renderQueued ? 'time' : 'ellipse-outline'} size={16} color="#ef4444" /><Text style={styles.summaryTitle}>Render status</Text></View>
               <Text style={styles.summaryText}>{renderStatus}</Text>
               {!!suggestions?.exportNote && <Text style={[styles.summaryText, { marginTop: 10 }]}>{suggestions.exportNote}</Text>}
             </View>
@@ -298,6 +304,11 @@ export default function Home() {
               <Text style={styles.exportMeta}>{resolution} · {fps} · {cropMode} · {exportFormat}</Text>
               <Text style={styles.exportMeta}>Source: {currentVideo.source}</Text>
             </View>
+            <Pressable style={[styles.downloadButton, !renderQueued && styles.downloadButtonDisabled]} onPress={downloadEnhancedVideo} accessibilityRole="button">
+              <Ionicons name="download-outline" size={20} color="#ffffff" />
+              <Text style={styles.primaryButtonText}>Download enhanced video</Text>
+            </Pressable>
+            <Text style={styles.downloadNote}>Downloads unlock when the actual video renderer is connected. The queue and export settings are ready.</Text>
           </View>
         )}
 
@@ -408,7 +419,7 @@ const styles = StyleSheet.create({
   optionChipText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   optionChipTextActive: { color: '#ffffff' },
   summaryBox: { backgroundColor: '#111111', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2f2f2f' },
-  summaryTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800', marginBottom: 8 },
+  summaryTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800', marginBottom: 0 },
   summaryText: { color: '#d4d4d8', fontSize: 14, lineHeight: 21 },
   outputCard: { backgroundColor: '#111111', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2f2f2f' },
   hookCard: { borderColor: '#ef4444' },
@@ -421,6 +432,9 @@ const styles = StyleSheet.create({
   tagPill: { backgroundColor: '#ef4444', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 },
   tagText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   exportCard: { backgroundColor: '#ef4444', borderRadius: 20, padding: 18, gap: 6 },
+  downloadButton: { backgroundColor: '#ef4444', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flexDirection: 'row', gap: 9 },
+  downloadButtonDisabled: { opacity: 0.62 },
+  downloadNote: { color: '#a1a1aa', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   exportTitle: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
   exportMeta: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
   error: { color: '#fca5a5', fontSize: 14, lineHeight: 20 },

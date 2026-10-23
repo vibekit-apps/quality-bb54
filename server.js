@@ -38,46 +38,6 @@ const routes = {
   'GET /health': (req, res) => json(res, { status: 'ok', uptime: process.uptime(), release: currentRelease() }),
 
   'GET /api/projects': (req, res) => json(res, store.read('projects', [])),
-  'GET /api/tiktok/status': (req, res) => {
-    const account = store.read('tiktok-account', null);
-    json(res, { connected: Boolean(account && account.accessToken), username: account?.username || null, scopes: account?.scopes || [] });
-  },
-  'GET /api/tiktok/connect': (req, res) => {
-    if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) return json(res, { error: 'TikTok connection is not configured yet.' }, 503);
-    const state = crypto.randomBytes(24).toString('hex');
-    store.write('tiktok-oauth-state', { state, expiresAt: Date.now() + 10 * 60 * 1000 });
-    const redirectUri = `${publicOrigin(req).origin}/api/tiktok/callback`;
-    const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
-    url.searchParams.set('client_key', process.env.TIKTOK_CLIENT_KEY);
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('scope', 'user.info.basic,video.publish');
-    url.searchParams.set('redirect_uri', redirectUri);
-    url.searchParams.set('state', state);
-    res.writeHead(302, { Location: url.toString(), 'Cache-Control': 'no-store' });
-    res.end();
-  },
-  'GET /api/tiktok/callback': async (req, res) => {
-    const url = new URL(req.url, 'http://localhost');
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-    const saved = store.read('tiktok-oauth-state', null);
-    if (!code || !saved || state !== saved.state || Date.now() > saved.expiresAt) return oauthPage(res, 'TikTok connection failed', 'This connection request expired. Return to Quality Booster and try again.');
-    try {
-      const redirectUri = `${publicOrigin(req).origin}/api/tiktok/callback`;
-      const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY, client_secret: process.env.TIKTOK_CLIENT_SECRET, code, grant_type: 'authorization_code', redirect_uri: redirectUri }).toString(),
-      });
-      const token = await tokenResponse.json();
-      if (!tokenResponse.ok || !token.access_token) throw new Error(token.error_description || 'TikTok did not return access.');
-      store.write('tiktok-account', { accessToken: token.access_token, refreshToken: token.refresh_token, expiresIn: token.expires_in, openId: token.open_id, scopes: String(token.scope || 'user.info.basic,video.publish').split(','), connectedAt: new Date().toISOString() });
-      store.write('tiktok-oauth-state', null);
-      oauthPage(res, 'TikTok connected', 'Return to Quality Booster. Your account is connected; every post will still ask for your confirmation.');
-    } catch (err) {
-      oauthPage(res, 'TikTok connection failed', err.message || 'Try again from Quality Booster.');
-    }
-  },
   'GET /api/trends': (req, res) => {
     const niche = String(new URL(req.url, 'http://localhost').searchParams.get('niche') || 'Practical basketball').slice(0, 80);
     const library = {
