@@ -1,4 +1,4 @@
-# TOOLS.md — quality-bb54
+# TOOLS.md — d4v1dflow
 
 > Only the part of this file ABOVE the "INJECTED CONTEXT ENDS" marker reaches
 > your context automatically. Everything below it is on disk in this same file
@@ -672,7 +672,7 @@ const r = await fetch(process.env.VIBEKIT_SIGN_IN_URL, { method: 'POST',
 ```
 Then set the app's own session cookie; `user.id` is stable per person in THIS app.
 Google's screen says "continue to vibekit.bot"; that is expected.
-**Owner admin, never an invented password** (needs the app's server; a static app adds a small one first): a server route keeps a random 43+ char `verifier` (HttpOnly cookie), redirects to `https://app.vibekit.bot/auth/app/owner?return_to=<encoded https://quality-bb54.vibekit.bot/vk-owner>&code_challenge=<base64url sha256(verifier)>`; the owner confirms in VibeKit and lands on exactly `/vk-owner` with `#vk_sign_in=<code>` in the hash. That page only clears it (history.replaceState) and POSTs it to the server, no third-party script, no redirect; the server redeems as above with `{ code, code_verifier }`. Admin is `user.owner === true` only.
+**Owner admin, never an invented password** (needs the app's server; a static app adds a small one first): a server route keeps a random 43+ char `verifier` (HttpOnly cookie), redirects to `https://app.vibekit.bot/auth/app/owner?return_to=<encoded https://d4v1dflow.vibekit.bot/vk-owner>&code_challenge=<base64url sha256(verifier)>`; the owner confirms in VibeKit and lands on exactly `/vk-owner` with `#vk_sign_in=<code>` in the hash. That page only clears it (history.replaceState) and POSTs it to the server, no third-party script, no redirect; the server redeems as above with `{ code, code_verifier }`. Admin is `user.owner === true` only.
 
 ## Payments — the owner connects Stripe once, the app takes money with no key
 Real payments, one time or subscriptions, go straight into the owner's own
@@ -937,7 +937,7 @@ curl -s -X POST "$VIBEKIT_API_URL/api/v1/hosting/app/$VIBEKIT_APP_ID/deps" \
   asked for): the `screenshot` tool on the live URL. It is the web version of the same code. The camera, haptics,
   notifications and anything else phone-only can only be checked by the user
   in Expo Go, so say that instead of claiming it works.
-- **The phone:** the user opens https://vibekit.bot/expo-go/quality-bb54, which
+- **The phone:** the user opens https://vibekit.bot/expo-go/d4v1dflow, which
   opens the app in the free Expo Go app and helps them install it. After every
   deploy the phone gets the new version when they close and reopen it in Expo
   Go: tell them that, never "refresh".
