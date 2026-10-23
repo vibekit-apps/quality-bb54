@@ -139,7 +139,6 @@ export default function Home() {
     setRenderStatus('Uploading your video to the secure render queue…');
     try {
       const config = await api<RenderSignature>('POST', '/api/render/signature', { title: currentVideo.title });
-      const fileName = `${currentVideo.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'video'}.mp4`;
       const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudName}/video/upload`;
       const response = await FileSystem.uploadAsync(uploadUrl, selectedVideo.uri, {
         httpMethod: 'POST',
@@ -151,11 +150,12 @@ export default function Home() {
           timestamp: String(config.timestamp),
           signature: config.signature,
           public_id: config.publicId,
-          filename_override: fileName,
         },
       });
       const result = JSON.parse(response.body || '{}');
-      if (response.status < 200 || response.status >= 300 || !result.secure_url) throw new Error(result.error?.message || 'The render service could not process this video.');
+      if (response.status < 200 || response.status >= 300 || !result.secure_url) {
+        throw new Error(result.error?.message || `Upload failed: ${response.status} ${response.body || 'Unknown render error'}`);
+      }
       setDownloadUrl(result.secure_url);
       setRenderStatus('Enhanced video is ready to review and download.');
       if (!suggestions) await buildCaptions();
