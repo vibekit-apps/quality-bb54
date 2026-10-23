@@ -3,7 +3,7 @@ import { Link } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 
@@ -140,21 +140,38 @@ export default function Home() {
     try {
       const config = await api<RenderSignature>('POST', '/api/render/signature', { title: currentVideo.title });
       const uploadUrl = `https://api.cloudinary.com/v1_1/${config.cloudName}/video/upload`;
-      const response = await FileSystem.uploadAsync(uploadUrl, selectedVideo.uri, {
-        httpMethod: 'POST',
-        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-        fieldName: 'file',
-        mimeType: 'video/mp4',
-        parameters: {
-          api_key: config.apiKey,
-          timestamp: String(config.timestamp),
-          signature: config.signature,
-          public_id: config.publicId,
-        },
-      });
-      const result = JSON.parse(response.body || '{}');
-      if (response.status < 200 || response.status >= 300 || !result.secure_url) {
-        throw new Error(result.error?.message || `Upload failed: ${response.status} ${response.body || 'Unknown render error'}`);
+      let status: number;
+      let body = '';
+      if (Platform.OS === 'web') {
+        const selectedFile = await fetch(selectedVideo.uri).then((r) => r.blob());
+        const form = new FormData();
+        form.append('file', selectedFile, `${currentVideo.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'video'}.mp4`);
+        form.append('api_key', config.apiKey);
+        form.append('timestamp', String(config.timestamp));
+        form.append('signature', config.signature);
+        form.append('public_id', config.publicId);
+        const response = await fetch(uploadUrl, { method: 'POST', body: form });
+        status = response.status;
+        body = await response.text();
+      } else {
+        const response = await FileSystem.uploadAsync(uploadUrl, selectedVideo.uri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          mimeType: 'video/mp4',
+          parameters: {
+            api_key: config.apiKey,
+            timestamp: String(config.timestamp),
+            signature: config.signature,
+            public_id: config.publicId,
+          },
+        });
+        status = response.status;
+        body = response.body || '';
+      }
+      const result = JSON.parse(body || '{}');
+      if (status < 200 || status >= 300 || !result.secure_url) {
+        throw new Error(result.error?.message || `Upload failed: ${status} ${body || 'Unknown render error'}`);
       }
       setDownloadUrl(result.secure_url);
       setRenderStatus('Enhanced video is ready to review and download.');
