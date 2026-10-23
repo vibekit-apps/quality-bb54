@@ -25,7 +25,6 @@ type SuggestionResponse = {
 type RenderSignature = {
   cloudName: string;
   apiKey: string;
-  uploadPreset: string;
   timestamp: number;
   publicId: string;
   signature: string;
@@ -144,13 +143,13 @@ export default function Home() {
       form.append('api_key', config.apiKey);
       form.append('timestamp', String(config.timestamp));
       form.append('signature', config.signature);
-      form.append('upload_preset', config.uploadPreset);
       form.append('public_id', config.publicId);
       const response = await fetch(`https://api.cloudinary.com/v1_1/${config.cloudName}/video/upload`, { method: 'POST', body: form });
       const result = await response.json();
       if (!response.ok || !result.secure_url) throw new Error(result.error?.message || 'The render service could not process this video.');
       setDownloadUrl(result.secure_url);
-      setRenderStatus('Enhanced video is ready to download.');
+      setRenderStatus('Enhanced video is ready to review and download.');
+      if (!suggestions) await buildCaptions();
     } catch (e) {
       setRenderStatus('Render did not complete.');
       setError((e as Error).message);
@@ -356,6 +355,19 @@ export default function Home() {
               <Text style={styles.primaryButtonText}>{rendering ? 'Rendering enhanced video…' : downloadUrl ? 'Download enhanced video' : 'Start render'}</Text>
             </Pressable>
             <Text style={styles.downloadNote}>{downloadUrl ? 'Your enhanced video is ready. Tap Download enhanced video to save it.' : 'Start render uploads the selected video securely, then prepares it for download.'}</Text>
+            {downloadUrl && (
+              <View style={styles.resultPanel}>
+                <View style={styles.resultHeader}><Ionicons name="checkmark-circle" size={22} color="#ef4444" /><Text style={styles.resultTitle}>Render result</Text></View>
+                <Text style={styles.resultText}>Your source video was uploaded and prepared as {resolution} at {fps} using {cropMode} crop.</Text>
+                <View style={styles.comparisonRow}>
+                  <View style={styles.comparisonCard}><Text style={styles.comparisonLabel}>SOURCE</Text><Text style={styles.comparisonValue}>{currentVideo.quality}</Text><Text style={styles.comparisonMeta}>{currentVideo.format}</Text></View>
+                  <Ionicons name="arrow-forward" size={20} color="#ef4444" />
+                  <View style={[styles.comparisonCard, styles.comparisonCardActive]}><Text style={styles.comparisonLabel}>ENHANCED</Text><Text style={styles.comparisonValue}>{resolution}</Text><Text style={styles.comparisonMeta}>{fps}</Text></View>
+                </View>
+                <Text style={styles.resultSubtitle}>Recommended hashtags</Text>
+                {suggestions ? <View style={styles.tagWrap}>{suggestions.hashtags.map((tag) => <View key={tag} style={styles.tagPill}><Text style={styles.tagText}>{tag}</Text></View>)}</View> : <Pressable style={styles.hashtagButton} onPress={buildCaptions} accessibilityRole="button"><Text style={styles.primaryButtonText}>Generate recommended hashtags</Text></Pressable>}
+              </View>
+            )}
           </View>
         )}
 
@@ -482,6 +494,18 @@ const styles = StyleSheet.create({
   downloadButton: { backgroundColor: '#ef4444', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flexDirection: 'row', gap: 9 },
   downloadButtonDisabled: { opacity: 0.62 },
   downloadNote: { color: '#a1a1aa', fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  resultPanel: { backgroundColor: '#111111', borderRadius: 18, borderWidth: 1, borderColor: '#ef4444', padding: 16, gap: 13 },
+  resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  resultTitle: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
+  resultText: { color: '#d4d4d8', fontSize: 14, lineHeight: 20 },
+  comparisonRow: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
+  comparisonCard: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 14, padding: 12, gap: 3 },
+  comparisonCardActive: { borderWidth: 1, borderColor: '#ef4444' },
+  comparisonLabel: { color: '#a1a1aa', fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  comparisonValue: { color: '#ffffff', fontSize: 19, fontWeight: '900' },
+  comparisonMeta: { color: '#d4d4d8', fontSize: 12, fontWeight: '700' },
+  resultSubtitle: { color: '#ffffff', fontSize: 15, fontWeight: '900', marginTop: 2 },
+  hashtagButton: { backgroundColor: '#ef4444', borderRadius: 14, alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 12 },
   exportTitle: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
   exportMeta: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
   error: { color: '#fca5a5', fontSize: 14, lineHeight: 20 },
