@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Link } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -119,9 +120,19 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>QUALITY BOOSTER</Text>
-        <Text style={styles.title}>Make rough clips hit harder.</Text>
-        <Text style={styles.subtitle}>Sharpen the video, prep the TikTok cut, then generate caption ideas before export.</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.eyebrow}>QUALITY BOOSTER</Text>
+            <Text style={styles.title}>Make rough clips hit harder.</Text>
+          </View>
+          <Link href="/" asChild>
+            <Pressable style={styles.homeButton} accessibilityRole="link" accessibilityLabel="Go home">
+              <Ionicons name="home" size={19} color="#ffffff" />
+              <Text style={styles.homeButtonText}>Home</Text>
+            </Pressable>
+          </Link>
+        </View>
+        <Text style={styles.subtitle}>Pick a real video from Photos, make it cleaner, then build the TikTok post around it.</Text>
       </View>
 
       <View style={styles.progressCard}>
@@ -155,7 +166,15 @@ export default function Home() {
               <Ionicons name="film" size={20} color="#ffffff" />
               <Text style={styles.primaryButtonText}>Choose from Photos</Text>
             </Pressable>
-            {selectedVideo?.uri && <Text style={styles.pickedNote}>Selected from your device: {selectedVideo.title}</Text>}
+            {selectedVideo?.uri && (
+              <View style={styles.selectedClip}>
+                <Ionicons name="checkmark-circle" size={22} color="#ef4444" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.selectedClipTitle}>Video selected</Text>
+                  <Text style={styles.selectedClipText}>{selectedVideo.title} · {selectedVideo.duration} · {selectedVideo.format}</Text>
+                </View>
+              </View>
+            )}
             <View style={styles.cardStack}> 
               {sampleVideos.map((video) => {
                 const active = selectedVideo?.title === video.title;
@@ -247,17 +266,17 @@ export default function Home() {
             {loadingSuggestions && <ActivityIndicator style={{ marginTop: 18 }} color="#ef4444" />}
             {suggestions && (
               <View style={styles.cardStack}>
-                <View style={styles.outputCard}>
-                  <Text style={styles.outputLabel}>Hook</Text>
-                  <Text style={styles.outputText}>{suggestions.hook}</Text>
+                <View style={[styles.outputCard, styles.hookCard]}>
+                  <View style={styles.outputHeading}><Ionicons name="flash" size={16} color="#ef4444" /><Text style={styles.outputLabel}>Open with this</Text></View>
+                  <Text style={styles.hookText}>{suggestions.hook}</Text>
                 </View>
                 <View style={styles.outputCard}>
-                  <Text style={styles.outputLabel}>Caption</Text>
+                  <View style={styles.outputHeading}><Ionicons name="chatbubble-ellipses" size={16} color="#ef4444" /><Text style={styles.outputLabel}>Caption</Text></View>
                   <Text style={styles.outputText}>{suggestions.caption}</Text>
                 </View>
-                <View style={styles.outputCard}>
-                  <Text style={styles.outputLabel}>Hashtags</Text>
-                  <Text style={styles.outputText}>{suggestions.hashtags.join(' ')}</Text>
+                <View style={[styles.outputCard, styles.tagCard]}>
+                  <View style={styles.outputHeading}><Ionicons name="pricetags" size={16} color="#ef4444" /><Text style={styles.outputLabel}>Best tags</Text></View>
+                  <View style={styles.tagWrap}>{suggestions.hashtags.map((tag) => <View key={tag} style={styles.tagPill}><Text style={styles.tagText}>{tag}</Text></View>)}</View>
                 </View>
               </View>
             )}
@@ -337,6 +356,9 @@ function OptionRow({ label, value, options, onChange }: { label: string; value: 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#111111' },
   header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
+  homeButton: { minHeight: 44, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#242424', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  homeButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
   eyebrow: { color: '#ef4444', fontSize: 12, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: '#ffffff', fontSize: 30, fontWeight: '900', lineHeight: 34, marginTop: 10 },
   subtitle: { color: '#d4d4d8', fontSize: 15, lineHeight: 22, marginTop: 10 },
@@ -365,6 +387,9 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#111111', color: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#2f2f2f', paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
   primaryButton: { backgroundColor: '#ef4444', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flexDirection: 'row', gap: 9 },
   pickedNote: { color: '#fca5a5', fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  selectedClip: { flexDirection: 'row', gap: 10, borderRadius: 16, backgroundColor: '#111111', borderWidth: 1, borderColor: '#ef4444', padding: 13, alignItems: 'center' },
+  selectedClipTitle: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
+  selectedClipText: { color: '#d4d4d8', fontSize: 13, marginTop: 3 },
   primaryButtonCompact: { backgroundColor: '#ef4444', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flex: 1 },
   primaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
   secondaryButton: { backgroundColor: '#222222', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, minHeight: 52, flex: 1 },
@@ -386,8 +411,15 @@ const styles = StyleSheet.create({
   summaryTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800', marginBottom: 8 },
   summaryText: { color: '#d4d4d8', fontSize: 14, lineHeight: 21 },
   outputCard: { backgroundColor: '#111111', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2f2f2f' },
-  outputLabel: { color: '#ef4444', fontSize: 13, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase' },
-  outputText: { color: '#ffffff', fontSize: 15, lineHeight: 22 },
+  hookCard: { borderColor: '#ef4444' },
+  tagCard: { backgroundColor: '#151515' },
+  outputHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 9 },
+  outputLabel: { color: '#ef4444', fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: .5 },
+  outputText: { color: '#ffffff', fontSize: 15, lineHeight: 23 },
+  hookText: { color: '#ffffff', fontSize: 20, lineHeight: 27, fontWeight: '900' },
+  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagPill: { backgroundColor: '#ef4444', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 },
+  tagText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   exportCard: { backgroundColor: '#ef4444', borderRadius: 20, padding: 18, gap: 6 },
   exportTitle: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
   exportMeta: { color: '#ffffff', fontSize: 14, fontWeight: '600' },

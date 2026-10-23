@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_ORIGIN, api } from '../lib/api';
 
@@ -70,16 +70,17 @@ export default function Home() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.brandRow}>
           <View>
-            <Text style={styles.eyebrow}>QUALITY BOOSTER</Text>
-            <Text style={styles.title}>Your creator command center.</Text>
+            <Text style={styles.eyebrow}>D4V1D.FLOW</Text>
+            <Text style={styles.title}>Better videos. Bigger reach.</Text>
           </View>
           <View style={styles.mark}><Ionicons name="flash" size={23} color="#ffffff" /></View>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.heroKicker}>READY TO CREATE</Text>
+          <Image source={require('../assets/d4v1d-flow-brand.jpg')} style={styles.brandImage} resizeMode="cover" accessibilityLabel="D4v1d.Flow brand mark" />
+          <Text style={styles.heroKicker}>ENHANCE · DISCOVER · PUBLISH</Text>
           <Text style={styles.heroTitle}>Make your next edit look expensive.</Text>
-          <Text style={styles.heroText}>Boost detail, build a stronger TikTok hook, and use niche-specific post ideas.</Text>
+          <Text style={styles.heroText}>Boost detail, discover strong niche angles, and prepare a TikTok post with better hashtags.</Text>
           <Link href="/studio" asChild>
             <Pressable style={styles.primaryButton} accessibilityRole="link">
               <Ionicons name="sparkles" size={20} color="#ffffff" />
@@ -149,7 +150,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#111111' }, content: { padding: 20, paddingBottom: 104, gap: 14 },
   brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 5 }, eyebrow: { color: '#ef4444', fontWeight: '900', fontSize: 12, letterSpacing: 1.3 }, title: { color: '#ffffff', fontSize: 27, lineHeight: 32, fontWeight: '900', maxWidth: 290, marginTop: 7 }, mark: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' },
-  hero: { marginTop: 8, padding: 21, borderRadius: 25, backgroundColor: '#ef4444', gap: 10 }, heroKicker: { color: '#ffffff', fontSize: 12, fontWeight: '900', letterSpacing: 1.1 }, heroTitle: { color: '#ffffff', fontSize: 27, lineHeight: 31, fontWeight: '900' }, heroText: { color: '#ffffff', fontSize: 15, lineHeight: 21 }, primaryButton: { minHeight: 52, borderRadius: 16, paddingHorizontal: 16, backgroundColor: '#111111', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 8 }, primaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  hero: { marginTop: 8, padding: 14, borderRadius: 25, backgroundColor: '#191919', borderWidth: 1, borderColor: '#473569', gap: 10, overflow: 'hidden' }, brandImage: { width: '100%', height: 140, borderRadius: 17, opacity: 0.92 }, heroKicker: { color: '#c4b5fd', fontSize: 12, fontWeight: '900', letterSpacing: 1.1, marginTop: 3 }, heroTitle: { color: '#ffffff', fontSize: 27, lineHeight: 31, fontWeight: '900' }, heroText: { color: '#ffffff', fontSize: 15, lineHeight: 21 }, primaryButton: { minHeight: 52, borderRadius: 16, paddingHorizontal: 16, backgroundColor: '#ef4444', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 8 }, primaryButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
   sectionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }, sectionTitle: { color: '#ffffff', fontSize: 20, fontWeight: '900' }, connected: { color: '#ef4444', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 }, refresh: { color: '#ef4444', fontSize: 14, fontWeight: '800' }, sectionSub: { color: '#a1a1aa', fontSize: 14, lineHeight: 20, marginTop: -7 },
   accountCard: { borderRadius: 21, backgroundColor: '#191919', borderWidth: 1, borderColor: '#2d2d2d', padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12 }, accountIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' }, accountTitle: { color: '#ffffff', fontSize: 16, fontWeight: '900' }, accountText: { color: '#a1a1aa', fontSize: 13, lineHeight: 18, marginTop: 3 }, connectButton: { backgroundColor: '#ef4444', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 13 }, connectText: { color: '#ffffff', fontSize: 14, fontWeight: '800' }, disclaimer: { color: '#737373', fontSize: 12, lineHeight: 17, marginTop: -5 },
   chips: { flexDirection: 'row', gap: 9, flexWrap: 'wrap' }, chip: { backgroundColor: '#1d1d1d', borderWidth: 1, borderColor: '#303030', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 }, chipActive: { backgroundColor: '#ef4444', borderColor: '#ef4444' }, chipText: { color: '#d4d4d8', fontSize: 13, fontWeight: '700' }, chipTextActive: { color: '#ffffff' }, customRow: { flexDirection: 'row', gap: 10 }, input: { flex: 1, backgroundColor: '#191919', color: '#ffffff', borderRadius: 15, borderWidth: 1, borderColor: '#303030', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }, addNiche: { width: 48, borderRadius: 15, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center' },
